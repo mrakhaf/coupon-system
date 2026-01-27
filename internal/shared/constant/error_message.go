@@ -13,7 +13,7 @@ var (
 	CodeErrorMessage = map[string]int{
 		ErrCouponNotFound:              http.StatusBadRequest,
 		ErrCouponNotActive:             http.StatusBadRequest,
-		ErrCouponNoRemainingAmount:     http.StatusBadRequest,
+		ErrCouponNoRemainingAmount:     http.StatusConflict,
 		ErrUserHasAlreadyClaimedCoupon: http.StatusConflict,
 	}
 )
