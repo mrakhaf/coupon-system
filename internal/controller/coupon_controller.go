@@ -3,7 +3,7 @@ package controller
 import (
 	"net/http"
 
-	"coupon-system/internal/entity"
+	"coupon-system/internal/dto/request"
 	"coupon-system/internal/usecase"
 
 	"github.com/labstack/echo/v4"
@@ -19,7 +19,7 @@ func NewCouponController(useCase *usecase.CouponUseCase) *CouponController {
 
 // Create Coupon - POST /api/coupons
 func (c *CouponController) CreateCoupon(e echo.Context) error {
-	req := new(entity.CreateCouponRequest)
+	req := new(request.CreateCouponRequest)
 	if err := e.Bind(req); err != nil {
 		return e.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 	}
@@ -38,7 +38,7 @@ func (c *CouponController) CreateCoupon(e echo.Context) error {
 
 // Claim Coupon - POST /api/coupons/claim
 func (c *CouponController) ClaimCoupon(e echo.Context) error {
-	req := new(entity.ClaimCouponRequest)
+	req := new(request.ClaimCouponRequest)
 	if err := e.Bind(req); err != nil {
 		return e.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 	}
@@ -47,15 +47,9 @@ func (c *CouponController) ClaimCoupon(e echo.Context) error {
 		return e.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 	}
 
-	err := c.useCase.ClaimCoupon(req)
+	statusCode, err := c.useCase.ClaimCoupon(req)
 	if err != nil {
-		if err.Error() == "user has already claimed this coupon" {
-			return e.JSON(http.StatusConflict, map[string]string{"error": "User has already claimed this coupon"})
-		}
-		if err.Error() == "coupon not found" || err.Error() == "coupon is not active" || err.Error() == "coupon has no remaining amount" {
-			return e.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
-		}
-		return e.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return e.JSON(statusCode, map[string]string{"error": err.Error()})
 	}
 
 	return e.JSON(http.StatusOK, map[string]string{"message": "Coupon claimed successfully"})
@@ -65,9 +59,9 @@ func (c *CouponController) ClaimCoupon(e echo.Context) error {
 func (c *CouponController) GetCouponDetails(e echo.Context) error {
 	name := e.Param("name")
 
-	details, err := c.useCase.GetCouponDetails(name)
+	details, code, err := c.useCase.GetCouponDetails(name)
 	if err != nil {
-		return e.JSON(http.StatusNotFound, map[string]string{"error": "Coupon not found"})
+		return e.JSON(code, map[string]string{"error": err.Error()})
 	}
 
 	return e.JSON(http.StatusOK, details)

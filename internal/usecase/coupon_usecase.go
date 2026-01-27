@@ -2,9 +2,13 @@ package usecase
 
 import (
 	"fmt"
+	"net/http"
 
+	"coupon-system/internal/dto/request"
+	"coupon-system/internal/dto/response"
 	"coupon-system/internal/entity"
 	"coupon-system/internal/repository"
+	"coupon-system/internal/shared/constant"
 )
 
 type CouponUseCase struct {
@@ -15,14 +19,11 @@ func NewCouponUseCase(repo *repository.CouponRepository) *CouponUseCase {
 	return &CouponUseCase{repo: repo}
 }
 
-func (uc *CouponUseCase) CreateCoupon(req *entity.CreateCouponRequest) (*entity.Coupon, error) {
+func (uc *CouponUseCase) CreateCoupon(req *request.CreateCouponRequest) (*entity.Coupon, error) {
 	coupon := &entity.Coupon{
-		Name:            req.Name,
-		Amount:          req.Amount,
-		RemainingAmount: req.Amount,
-		MaxUsage:        1,
-		UsedCount:       0,
-		IsActive:        true,
+		Name:     req.Name,
+		Amount:   req.Amount,
+		IsActive: true,
 	}
 
 	if err := uc.repo.Create(coupon); err != nil {
@@ -32,50 +33,62 @@ func (uc *CouponUseCase) CreateCoupon(req *entity.CreateCouponRequest) (*entity.
 	return coupon, nil
 }
 
-func (uc *CouponUseCase) ClaimCoupon(req *entity.ClaimCouponRequest) error {
-	// Check if user has already claimed this coupon
-	alreadyClaimed, err := uc.repo.HasUserClaimedCoupon(req.UserID, req.CouponName)
+func (uc *CouponUseCase) ClaimCoupon(req *request.ClaimCouponRequest) (code int, err error) {
+
+	err = uc.repo.ClaimCoupon(req.UserID, req.CouponName)
+
 	if err != nil {
-		return fmt.Errorf("failed to check claim status: %w", err)
+
+		code = constant.CodeErrorMessage[err.Error()]
+
+		if code == 0 {
+			code = http.StatusInternalServerError
+		}
+
+		return code, fmt.Errorf("failed to claim coupon: %w", err)
 	}
 
-	if alreadyClaimed {
-		return fmt.Errorf("user has already claimed this coupon")
-	}
-
-	// Check if coupon has remaining amount and is active
-	coupon, err := uc.repo.GetByName(req.CouponName)
-	if err != nil {
-		return fmt.Errorf("coupon not found: %w", err)
-	}
-
-	if !coupon.IsActive {
-		return fmt.Errorf("coupon is not active")
-	}
-
-	if coupon.RemainingAmount <= 0 {
-		return fmt.Errorf("coupon has no remaining amount")
-	}
-
-	// Use transaction to ensure atomicity
-	return uc.repo.ClaimCouponTransaction(req.UserID, coupon.ID, coupon.Amount)
+	return http.StatusCreated, nil
 }
 
-func (uc *CouponUseCase) GetCouponDetails(name string) (*entity.CouponDetailsResponse, error) {
-	coupon, err := uc.repo.GetByName(name)
+func (uc *CouponUseCase) GetCouponDetails(couponName string) (*response.GetCouponDetailsResponse, int, error) {
+
+	coupon, err := uc.repo.GetByName(couponName)
+
 	if err != nil {
-		return nil, fmt.Errorf("failed to get coupon: %w", err)
+
+		code := constant.CodeErrorMessage[err.Error()]
+
+		if code == 0 {
+			code = http.StatusInternalServerError
+		}
+
+		return nil, code, fmt.Errorf("failed to get coupon details: %w", err)
 	}
 
-	claimedBy, err := uc.repo.GetClaimedByUsers(name)
+	claimedCoupon, err := uc.repo.GetListClaimedCouponByName(couponName)
+
 	if err != nil {
-		return nil, fmt.Errorf("failed to get claimed users: %w", err)
+
+		code := constant.CodeErrorMessage[err.Error()]
+
+		if code == 0 {
+			code = http.StatusInternalServerError
+		}
+
+		return nil, code, fmt.Errorf("failed to get coupon details: %w", err)
 	}
 
-	return &entity.CouponDetailsResponse{
+	var claimedBy []string
+	for _, c := range claimedCoupon {
+		claimedBy = append(claimedBy, c.UserID)
+	}
+
+	return &response.GetCouponDetailsResponse{
 		Name:            coupon.Name,
 		Amount:          coupon.Amount,
-		RemainingAmount: coupon.RemainingAmount,
+		RemainingAmount: coupon.Amount - len(claimedCoupon),
 		ClaimedBy:       claimedBy,
-	}, nil
+	}, http.StatusOK, nil
+
 }

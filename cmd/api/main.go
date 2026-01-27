@@ -13,6 +13,7 @@ import (
 	"coupon-system/internal/infrastructure"
 	"coupon-system/internal/repository"
 	"coupon-system/internal/usecase"
+	"coupon-system/internal/validator"
 )
 
 func main() {
@@ -45,6 +46,8 @@ func main() {
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
 	e.Use(middleware.CORS())
+
+	e.Validator = validator.New()
 
 	// Routes
 	e.GET("/", func(c echo.Context) error {
