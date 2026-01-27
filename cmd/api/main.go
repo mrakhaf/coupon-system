@@ -59,7 +59,7 @@ func main() {
 
 	// Coupon routes
 	couponGroup := e.Group("/api/coupons")
-	couponGroup.POST("/", couponController.CreateCoupon)
+	couponGroup.POST("", couponController.CreateCoupon)
 	couponGroup.POST("/claim", couponController.ClaimCoupon)
 	couponGroup.GET("/:name", couponController.GetCouponDetails)
 
