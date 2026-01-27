@@ -79,7 +79,7 @@ func (uc *CouponUseCase) GetCouponDetails(couponName string) (*response.GetCoupo
 		return nil, code, fmt.Errorf("failed to get coupon details: %w", err)
 	}
 
-	var claimedBy []string
+	claimedBy := []string{}
 	for _, c := range claimedCoupon {
 		claimedBy = append(claimedBy, c.UserID)
 	}
