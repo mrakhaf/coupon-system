@@ -169,3 +169,7 @@ go build -o coupon-system ./cmd/api
 ## License
 
 MIT License
+
+
+## Stress Test Using k6
+https://github.com/mrakhaf/coupon-system-k6 
