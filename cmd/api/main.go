@@ -43,6 +43,14 @@ func main() {
 	e := echo.New()
 
 	// Middleware
+	e.Use(middleware.BodyDump(func(c echo.Context, req, res []byte) {
+		log.Println("===== BODY DUMP =====")
+		log.Println("METHOD :", c.Request().Method)
+		log.Println("URI    :", c.Request().RequestURI)
+		log.Println("REQ    :", string(req))
+		log.Println("RES    :", string(res))
+		log.Println("=====================")
+	}))
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
 	e.Use(middleware.CORS())

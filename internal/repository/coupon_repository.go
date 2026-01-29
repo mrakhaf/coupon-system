@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type CouponRepository struct {
@@ -42,23 +43,38 @@ func (r *CouponRepository) GetByName(name string) (*entity.Coupon, error) {
 	return &coupon, nil
 }
 
+func (r *CouponRepository) GetCouponWithLock(name string) (*entity.Coupon, error) {
+	var coupon entity.Coupon
+	err := r.db.
+		Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("name = ?", name).
+		First(&coupon).Error
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, fmt.Errorf(constant.ErrCouponNotFound)
+		}
+		return nil, err
+	}
+	return &coupon, nil
+}
+
 func (r *CouponRepository) ClaimCoupon(userID string, couponName string) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
-		//check if user has already claimed this coupon
 
-		isClaimed, err := r.WithTx(tx).HasUserClaimedCoupon(userID, couponName)
+		// 1. lock coupon row (this is the key)
+		coupon, err := r.WithTx(tx).GetCouponWithLock(couponName)
+		if err != nil {
+			return err
+		}
+
+		//check if user has already claimed this coupon
+		isClaimed, err := r.WithTx(tx).HasUserClaimedCoupon(userID, coupon.ID)
 		if err != nil {
 			return err
 		}
 
 		if isClaimed {
 			return fmt.Errorf(constant.ErrUserHasAlreadyClaimedCoupon)
-		}
-
-		//check if coupon has remaining amount and is active
-		coupon, err := r.WithTx(tx).GetByName(couponName)
-		if err != nil {
-			return err
 		}
 
 		if !coupon.IsActive {
@@ -92,13 +108,12 @@ func (r *CouponRepository) ClaimCoupon(userID string, couponName string) error {
 	})
 }
 
-func (r *CouponRepository) HasUserClaimedCoupon(userID string, couponName string) (bool, error) {
+func (r *CouponRepository) HasUserClaimedCoupon(userID string, couponID uuid.UUID) (bool, error) {
 	var count int64
 
 	err := r.db.
 		Model(&entity.CouponClaim{}).
-		Joins("JOIN coupons ON coupons.id = coupon_claims.coupon_id").
-		Where("coupon_claims.user_id = ? AND coupons.name = ?", userID, couponName).
+		Where("user_id = ? AND coupon_id = ?", userID, couponID).
 		Count(&count).Error
 
 	if err != nil {
